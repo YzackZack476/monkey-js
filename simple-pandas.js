@@ -1,12 +1,3 @@
-// let datos = [
-//     {"Grupo": "A", "Color":"Rojo", "Calificacion":10, "Audiencia":10},
-//     {"Grupo": "A", "Color":"Rojo", "Calificacion":5, "Audiencia":5},
-//     {"Grupo": "A", "Color":"Morado", "Calificacion":20, "Audiencia":3},
-//     {"Grupo": "B", "Color":"Verde", "Calificacion":10, "Audiencia":2},
-//     {"Grupo": "B", "Color":"Verde", "Calificacion":4, "Audiencia":15},
-//     {"Grupo": "C", "Color":"Azul", "Calificacion":10, "Audiencia":9}
-// ]
-
 
 
 //% Funciones para columnas ===================
@@ -39,6 +30,96 @@ function calc_unique(array){
     return Array.from(new Set(array));   
 }
 
+function calc_booleans(array){
+    return  array.reduce((sum, next)=> sum && next, true);
+}
+
+function calc_zip(args){
+    return args.at(0).map((_,i) => args.map(item=>item[i]) )
+}
+
+function merge(){
+
+    //+ Default parameters
+    let df_a = arguments[0];
+    let df_b = arguments[1];
+    const how = arguments[2];
+    arguments=arguments[3];
+    let on = arguments['on'];
+    let left_on = arguments['left_on'];
+    let right_on = arguments['right_on'];
+    const suffixies = arguments['suffixies'] ? arguments['suffixies']:['_X','_Y'];
+
+
+    //* Declare variables to use into de function =================
+    let reg_merged = [];    // Will storate the data merged
+    let matches_list;       
+    let match_per_row;      
+    let existed_matches;    
+
+
+    //+ Create two arrays "left_on" and "right_on" always =================
+    if (on !== undefined){
+        left_on = on;
+        right_on = on;
+    }    
+    on = calc_zip(args=[left_on,right_on]);
+
+    //* Renname columns that coexist in both dataframes ====================
+    const dont_touch = left_on.concat(right_on);    // Except these
+
+    const conservate_a =  df_a.columns.filter(column => !dont_touch.includes(column));
+    const conservate_b =  df_b.columns.filter(column => !dont_touch.includes(column));
+    const col_collision = conservate_a.filter(column => conservate_b.includes(column));
+    const rename_a_values = col_collision.map(column => column+suffixies[0]);
+    const rename_b_values = col_collision.map(column => column+suffixies[1]);
+
+    // Renaming data and crearing new dataframes
+    const dict_rename_a = Object.fromEntries(calc_zip([col_collision,rename_a_values])); 
+    const dict_rename_b = Object.fromEntries(calc_zip([col_collision,rename_b_values])); 
+
+    df_a = new DataFrame(rename_columns(df_a.datos, dict_rename_a));
+    df_b = new DataFrame(rename_columns(df_b.datos, dict_rename_b));
+    
+    //% Iterate for each row in df_a    ====================
+    for(let i=0; i<df_a.shape.at(); i++){
+
+        existed_matches = false;
+        //! Iterate for each row in df_b
+        for(let e=0; e<df_b.shape.at(); e++){
+            
+            //+ Iterate for each columns to comparate | on = ['ID','NAME']
+            matches_list = on.map( ([left_on, right_on] =  zipped) =>{ 
+                return df_a[left_on][i] == df_b[right_on][e] ? true:false; 
+            });
+                                                            //* .......................................................   col1 | col2 | col3
+            match_per_row = calc_booleans(matches_list);    //* Sum the row results, example:  df_a[row1] vs df_b[row1] | [true, true, true] = true
+            
+            //* If match_per_row is true, merge both rows together
+            match_per_row ? reg_merged.push({...df_a.datos[i],...df_b.datos[e]}):false;
+            match_per_row ? existed_matches=true:false
+            
+        } //! Next row in df_b
+
+        existed_matches===false && how==='left' ? reg_merged.push({...df_a.datos[i]}):false;
+
+    }   //% Next row in df_a
+
+    console.table(reg_merged);
+    return new DataFrame(reg_merged);
+}
+
+function rename_columns(table_array, columns_dict={}){
+    let table_array_copy = structuredClone(table_array);
+
+    return table_array_copy.map(row=>{
+        Object.entries(columns_dict).forEach(([older, newer] = item) =>{
+            row[newer] = row[older];
+            delete row[older];
+        });
+        return row;
+    });
+}
 
 //! Funciones para agrupaciones ===================
 function get_column_values(table_array=[], column){
@@ -57,9 +138,6 @@ function conservarte_columns(table_array, column_list){
     });
 }
 
-
-
-
 //% Clases
 class Grouper{
     constructor(group, by, columns){
@@ -74,8 +152,6 @@ class Grouper{
 
         // //* Show
         console.table(this.table_grouped);
-    
-
     }
 
     
@@ -106,12 +182,10 @@ class Grouper{
                 switch(func2apply){
                     case 'max':
                         result = calc_max(row[column_target]);
-                        break;
-    
+                        break;    
                     case 'min':
                         result = calc_min(row[column_target]);
-                        break;
-    
+                        break;    
                     case 'sum':
                         result = (sep[column_target] === undefined) ? calc_sum(row[column_target],'') : calc_sum(row[column_target], sep[column_target]);
                         break;
@@ -124,7 +198,7 @@ class Grouper{
 
                 delete row[column_target];
                 row[column_target] = result;   
-                   
+                
                 }
 
             return row;
@@ -165,7 +239,7 @@ class DataFrame{
     //* ==============================================================
     
     //% Metodos GETTER ==========
-    get see(){
+    get me(){
         return console.table(this.datos);
     }
 
@@ -203,5 +277,8 @@ class DataFrame{
         return new Grouper(data_grouped,by,this.columns);
     }
 
-}
+    merge(df_b, how, args){
+        return merge(this, df_b, how, args);
+    }
 
+}
