@@ -1,6 +1,12 @@
-
-
-//% Funciones para columnas ===================
+ 
+//NOTE: ======================================================================
+//NOTE: Funciones de operadores aritmeticos  
+function calc_first(array){
+	return array.at(0);
+}
+function calc_last(array){
+	return array.at(-1);
+}   
 function calc_max(array){
     if (typeof array.at() === 'string'){ throw('No valido para strings');}
     const max = array.reduce((a, b) => Math.max(a, b));    
@@ -38,17 +44,81 @@ function calc_zip(args){
     return args.at(0).map((_,i) => args.map(item=>item[i]) )
 }
 
+//! ==============================================================================
+//! Funciones de operadores comparativos        
+function calc_equals(nominal, array){
+    let indexes=[];
+    let idx = array.indexOf(nominal);
+
+    while(idx !== -1){
+        indexes.push(idx);
+        idx = array.indexOf(nominal, idx + 1);
+    }
+    return indexes;
+}
+
+function calc_isin(nominal_array, array){
+    return nominal_array.map(nominal=>{
+        return calc_equals(nominal,array);
+    }).reduce((before,current)=> before.concat(current));
+}
+
+function evaluate(operador,nominal,array){
+    switch (operador){
+        case ">":
+            return array.map((item, index)=> item > nominal ? index:'pass').filter(each=>each!='pass');
+
+        case ">=":
+            return array.map((item, index)=> item >= nominal ? index:'pass').filter(each=>each!='pass');
+
+        case "<":
+        return array.map((item, index)=> item < nominal ? index:'pass').filter(each=>each!='pass');
+
+        case "<=":
+            return array.map((item, index)=> item <= nominal ? index:'pass').filter(each=>each!='pass');
+        
+        case "<>":
+            return array.map((item, index)=> item != nominal ? index:'pass').filter(each=>each!='pass');
+        
+    }
+}
+
+function between(low,hight,array){
+    return array.map((item, index)=> ((item <= hight) && (item >= low)) ? index:'pass').filter(each=>each!='pass');
+}
+
+//+ ==============================================================================
+//+ Funciones de operadores logicos         
+function and(){
+    let array_main= arguments[0];
+    for(let i=0; i<arguments.length-1; i++){
+        array_main = array_main.filter(index=> arguments[i+1].includes(index));
+    }
+    return calc_unique(array_main);
+}
+
+function or(){
+    let array_main= arguments[0];
+    for(let i=0; i<arguments.length-1; i++){
+        array_main = array_main.concat(arguments[i+1]);
+    }
+    return calc_unique(array_main);
+}
+
+//% ==============================================================================
+//% Funciones para el Dataframe     
+
 function merge(){
 
     //+ Default parameters
     let df_a = arguments[0];
     let df_b = arguments[1];
     const how = arguments[2];
-    arguments=arguments[3];
-    let on = arguments['on'];
-    let left_on = arguments['left_on'];
-    let right_on = arguments['right_on'];
-    const suffixies = arguments['suffixies'] ? arguments['suffixies']:['_X','_Y'];
+    args=arguments[3];
+    let on = args['on'];
+    let left_on = args['left_on'];
+    let right_on = args['right_on'];
+    const suffixies = args['suffixies'] ? args['suffixies']:['_X','_Y'];
 
 
     //* Declare variables to use into de function =================
@@ -109,6 +179,15 @@ function merge(){
     return new DataFrame(reg_merged);
 }
 
+function concat(){
+    const df_a = arguments[0];
+    const df_b = arguments[1];
+    const new_data = df_a.datos.concat(df_b.datos);
+    
+    console.table(new_data);
+    return new DataFrame(new_data);
+}
+
 function rename_columns(table_array, columns_dict={}){
     let table_array_copy = structuredClone(table_array);
 
@@ -121,7 +200,8 @@ function rename_columns(table_array, columns_dict={}){
     });
 }
 
-//! Funciones para agrupaciones ===================
+//! ==============================================================================
+//! Funciones para agrupaciones        
 function get_column_values(table_array=[], column){
     let lista=[];
     table_array.forEach(row=> lista.push(row[column]));
@@ -138,7 +218,8 @@ function conservarte_columns(table_array, column_list){
     });
 }
 
-//% Clases
+//% ==============================================================================
+//% Clases      
 class Grouper{
     constructor(group, by, columns){
         this.data_grouped = group;                //*------------------------------- Data gruped with keys
@@ -155,7 +236,7 @@ class Grouper{
     }
 
     
-    agg(agg_dict, sep=[]){
+    agg(agg_dict, sep={}){
 
         let columns_in_agg = Object.keys(agg_dict);
         
@@ -180,6 +261,12 @@ class Grouper{
                 
                 let result;      
                 switch(func2apply){
+                    case 'first':
+                        result = calc_first(row[column_target]);
+                        break;
+                    case 'last':
+                        result = calc_last(row[column_target]);
+                        break;
                     case 'max':
                         result = calc_max(row[column_target]);
                         break;    
@@ -227,12 +314,22 @@ class DataFrame{
             let values = get_column_values(this.#data, column_name);
 
             this[column_name] = new Object(Object.assign([],values));
+            this[column_name].first = (params=value)=>calc_first(params);
+            this[column_name].last = (params=value)=>calc_last(params);
             this[column_name].max = (params=values)=>calc_max(params);  
             this[column_name].min = (params=values)=>calc_min(params);  
             this[column_name].sum = (valores=values, sep='')=>calc_sum(valores, sep);  
             this[column_name].count = (params=values)=>calc_count(params);  
             this[column_name].unique = (params=values)=>calc_unique(params);
+            
+            //* Funtions in series
+            this[column_name].equals = (nominal, array=values)=>calc_equals(nominal,array);
+            this[column_name].isin = (nominal_array,array=values)=>calc_isin(nominal_array,array);
+            this[column_name].evaluate = (operador,nominal,array=values)=>evaluate(operador,nominal,array);
+            this[column_name].bewteen = (low,hight,array=values)=>between(low,hight,array)
         });
+
+
     }
 
 
@@ -281,4 +378,21 @@ class DataFrame{
         return merge(this, df_b, how, args);
     }
 
+    filter(index_condition){
+        //! Deveria devolver un nuevo dataframe
+        if ((index_condition === undefined) || (index_condition.length === 0)) return undefined;
+
+        const new_data = this.datos.filter((_,index)=> index_condition.includes(index));
+        console.table(new_data);
+        return new DataFrame(new_data);
+    }
+
+    concat(df_b){
+        return concat(this, df_b);
+    }
+    
 }
+
+
+
+
