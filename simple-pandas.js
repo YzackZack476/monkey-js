@@ -8,16 +8,36 @@ function calc_last(array){
 	return array.at(-1);
 }   
 function calc_max(array){
-    if (typeof array.at() === 'string'){ throw('No valido para strings');}
-    const max = array.reduce((a, b) => Math.max(a, b));    
-    return max;
-}
+    switch (typeof array.at()){
+        case 'string':
+            let reg_datetime = /\d\d\d\d-\d\d-\d\d \d\d:\d\d/;
+            const are_all_datetime = array.every(item=> reg_datetime.test(item));
 
+            if (are_all_datetime){
+                return array.reduce((acumulado, actual) => acumulado > actual ? acumulado : actual);
+            }else{
+                throw('Solo valido para datos numericos y tipo fecha; no sea imbecíl!');
+            }
+        case 'number':
+            const max = array.reduce((a, b) => Math.max(a, b));    
+            return max;
+    }
+}
 function calc_min(array){
-    const min = array.reduce((a, b) => Math.min(a, b));    
-    return min;
-}
+    switch (typeof array.at()){
+        case 'string':
+            let reg_datetime = /\d\d\d\d-\d\d-\d\d \d\d:\d\d/;
+            if (reg_datetime.test(array.at(0))){
+                return array.reduce((acumulado, actual) => acumulado < actual ? acumulado : actual);
+            }else{
+                throw('Solo valido para datos numericos y tipo fecha');
+            }
+        case 'number':
+            const min = array.reduce((a, b) => Math.min(a, b));    
+            return min;
+    }
 
+}
 function calc_sum(array, sep=''){
     if (typeof array.at() === 'number'){
         const sum = array.reduce((a, b) => a+b);    
@@ -27,25 +47,42 @@ function calc_sum(array, sep=''){
         return sum;
     }
 }
-
+function calc_avg(array){
+    if(typeof array.at() !== 'number'){
+        return undefined;
+    }
+    const sum = array.reduce((a, b) => a+b);   
+    return sum/array.length; 
+}
+function calc_opr(){
+    const operador = arguments[0];
+    const array = arguments[1];
+    return array.map(nominal=> eval(nominal+operador));
+}
 function calc_count(array){
     return array.length;
 }
-
 function calc_unique(array){
     return Array.from(new Set(array));   
 }
-
 function calc_booleans(array){
     return  array.reduce((sum, next)=> sum && next, true);
 }
-
 function calc_zip(args){
     return args.at(0).map((_,i) => args.map(item=>item[i]) )
 }
 
+
 //! ==============================================================================
 //! Funciones de operadores comparativos        
+
+
+function indexes_2_series(length, indexes){
+    let series = new Array(length).fill(false);
+    indexes.forEach(index=>series[index]=true);
+    return series;
+}
+
 function calc_equals(nominal, array){
     let indexes=[];
     let idx = array.indexOf(nominal);
@@ -55,6 +92,21 @@ function calc_equals(nominal, array){
         idx = array.indexOf(nominal, idx + 1);
     }
     return indexes;
+}
+
+function calc_not_equals(nominal, array){
+    let drop_indexes=[];
+    let idx = array.indexOf(nominal);
+
+    while(idx !== -1){
+        drop_indexes.push(idx);
+        idx = array.indexOf(nominal, idx + 1);
+    }
+
+    const all_indexes = Array.from({length: array.length}, (_,index) => index);
+    const not_indexes = all_indexes.filter(item=> !drop_indexes.includes(item));
+    
+    return not_indexes;
 }
 
 function calc_isin(nominal_array, array){
@@ -105,16 +157,20 @@ function or(){
     return calc_unique(array_main);
 }
 
+
+
 //% ==============================================================================
 //% Funciones para el Dataframe     
 
 function merge(){
 
     //+ Default parameters
-    let df_a = arguments[0];
-    let df_b = arguments[1];
-    const how = arguments[2];
-    args=arguments[3];
+    let df_a    = arguments[0];
+    let df_b    = arguments[1];
+    const how   = arguments[2];
+    const args  = arguments[3];
+    const debug = arguments[4];
+
     let on = args['on'];
     let left_on = args['left_on'];
     let right_on = args['right_on'];
@@ -133,7 +189,7 @@ function merge(){
         left_on = on;
         right_on = on;
     }    
-    on = calc_zip(args=[left_on,right_on]);
+    on = calc_zip([left_on,right_on]);
 
     //* Renname columns that coexist in both dataframes ====================
     const dont_touch = left_on.concat(right_on);    // Except these
@@ -159,7 +215,7 @@ function merge(){
         for(let e=0; e<df_b.shape.at(); e++){
             
             //+ Iterate for each columns to comparate | on = ['ID','NAME']
-            matches_list = on.map( ([left_on, right_on] =  zipped) =>{ 
+            matches_list = on.map( ( [left_on, right_on] =  zipped) =>{ 
                 return df_a[left_on][i] == df_b[right_on][e] ? true:false; 
             });
                                                             //* .......................................................   col1 | col2 | col3
@@ -175,16 +231,18 @@ function merge(){
 
     }   //% Next row in df_a
 
-    console.table(reg_merged);
+    if (debug===true) console.table(reg_merged);
     return new DataFrame(reg_merged);
 }
 
-function concat(){
+function concatenate(){
     const df_a = arguments[0];
     const df_b = arguments[1];
+    const debug = arguments[2];
+
     const new_data = df_a.datos.concat(df_b.datos);
     
-    console.table(new_data);
+    if (debug === true) console.table(new_data);
     return new DataFrame(new_data);
 }
 
@@ -198,6 +256,12 @@ function rename_columns(table_array, columns_dict={}){
         });
         return row;
     });
+}
+
+function get_by_index(array,indexes){
+    const array_values=[];
+    indexes.forEach(index=> array_values.push(array.at(index)));
+    return array_values;
 }
 
 //! ==============================================================================
@@ -221,25 +285,22 @@ function conservarte_columns(table_array, column_list){
 //% ==============================================================================
 //% Clases      
 class Grouper{
-    constructor(group, by, columns){
+    constructor(group, by, columns, debug){
         this.data_grouped = group;                //*------------------------------- Data gruped with keys
         this.by = by;                             //*------------------------------- Columns in by list
         this.all_columns = columns;               //*------------------------------- All columns in the df
         this.ungruped_columns = columns.filter(each => ! by.includes(each));
-
+        this.debug = debug; 
 
         let table_grouped = Object.values(this.data_grouped).map(each_table_group=>each_table_group.at());
         this.table_grouped = conservarte_columns(table_grouped, this.by)
 
-        // //* Show
-        console.table(this.table_grouped);
+
+        if (debug===true) console.table(this.table_grouped);
     }
 
     
     agg(agg_dict, sep={}){
-
-        let columns_in_agg = Object.keys(agg_dict);
-        
         //+ 1.- Make agrupation and the other columns become in a list
         //*Trying to do the next: {Grupo: 'A', Color: 'Morado', Calificacion: [], Audiencia: [] } 
         let table_arrays = Object.values(this.data_grouped).map(table_group=>{
@@ -254,48 +315,65 @@ class Grouper{
 
             return uniq_records;
         });
-
+        
         //* 2.- Adding functions to the columns in agg_dict
         let final_df_grouped = table_arrays.map(row=>{
-            for(const [column_target, func2apply] of Object.entries(agg_dict)){
+            for(let [column_target, funcion_2_aplicate] of Object.entries(agg_dict)){
                 
-                let result;      
-                switch(func2apply){
-                    case 'first':
-                        result = calc_first(row[column_target]);
-                        break;
-                    case 'last':
-                        result = calc_last(row[column_target]);
-                        break;
-                    case 'max':
-                        result = calc_max(row[column_target]);
-                        break;    
-                    case 'min':
-                        result = calc_min(row[column_target]);
-                        break;    
-                    case 'sum':
-                        result = (sep[column_target] === undefined) ? calc_sum(row[column_target],'') : calc_sum(row[column_target], sep[column_target]);
-                        break;
-                    case 'unique':
-                        result = calc_unique(row[column_target]);
-                        break;
-                    default:
-                        console.log("That functions is not defined yet");
-                }
+                
+                funcion_2_aplicate = Array.isArray(funcion_2_aplicate) ?  funcion_2_aplicate:[funcion_2_aplicate];
+                
+                for (const funcion of funcion_2_aplicate){
+                    let result;      
 
-                delete row[column_target];
-                row[column_target] = result;   
-                
+                    switch(funcion){
+                        case 'first':
+                            result = calc_first(row[column_target]);
+                            break;
+                        case 'last':
+                            result = calc_last(row[column_target]);
+                            break;
+                        case 'max':
+                            result = calc_max(row[column_target]);
+                            break;    
+                        case 'min':
+                            result = calc_min(row[column_target]);
+                            break;    
+                        case 'sum':
+                            result = (sep[column_target] === undefined) ? calc_sum(row[column_target],'') : calc_sum(row[column_target], sep[column_target]);
+                            break;
+                        case 'avg':
+                            result = calc_avg(row[column_target]);
+                            break;
+                        case 'unique':
+                            result = calc_unique(row[column_target]);
+                            break;
+                        case 'count':
+                            result = calc_count(row[column_target]);
+                            break;
+                        default:
+                            console.log("That functions is not defined yet");
+                    }
+    
+                    row[`${column_target}_${funcion}`] = result;   
                 }
+                delete row[column_target];
+            }
 
             return row;
         });
 
-        //* 3.- Return just columns in by and agg_dict
-        let columns_to_conservate =  this.by.concat(columns_in_agg); 
+
+        //* 3.- Return just columns in by and agg_dict + function done
+
+        const columns_in_agg = [];
+        for(const[key,value] of Object.entries(agg_dict)){
+            Array.isArray(value) ? value.forEach(item=>columns_in_agg.push(`${key}_${item}`)) : columns_in_agg.push(`${key}_${value}`) 
+        }
+        let columns_to_conservate =  this.by.concat(columns_in_agg);         
         let final_df = conservarte_columns(final_df_grouped, columns_to_conservate);
 
-        console.table(final_df);
+        if (this.debug===true) console.table(final_df);
         return new DataFrame(final_df);
     }
     
@@ -304,8 +382,9 @@ class Grouper{
 class DataFrame{
     #data;
     #shape;
-    constructor(initial_data){
+    constructor(initial_data, debug=false){
         this.#initial_setter([...initial_data]);
+        this.debug = debug;
     }
 
     #initial_setter(in_data){
@@ -314,23 +393,26 @@ class DataFrame{
             let values = get_column_values(this.#data, column_name);
 
             this[column_name] = new Object(Object.assign([],values));
-            this[column_name].first = (params=value)=>calc_first(params);
-            this[column_name].last = (params=value)=>calc_last(params);
+            this[column_name].first = (params=values)=>calc_first(params);
+            this[column_name].last = (params=values)=>calc_last(params);
             this[column_name].max = (params=values)=>calc_max(params);  
             this[column_name].min = (params=values)=>calc_min(params);  
             this[column_name].sum = (valores=values, sep='')=>calc_sum(valores, sep);  
             this[column_name].count = (params=values)=>calc_count(params);  
             this[column_name].unique = (params=values)=>calc_unique(params);
+            this[column_name].avg = (params=values)=>calc_avg(params);
             
             //* Funtions in series
             this[column_name].equals = (nominal, array=values)=>calc_equals(nominal,array);
             this[column_name].isin = (nominal_array,array=values)=>calc_isin(nominal_array,array);
             this[column_name].evaluate = (operador,nominal,array=values)=>evaluate(operador,nominal,array);
-            this[column_name].bewteen = (low,hight,array=values)=>between(low,hight,array)
+            this[column_name].bewteen = (low,hight,array=values)=>between(low,hight,array);
+            this[column_name].opr = (operador, array=values)=> calc_opr(operador,array);
+
+            this[column_name].not_equals = (nominal, array=values)=>calc_not_equals(nominal,array); 
         });
-
-
     }
+
 
 
     //* ==============================================================
@@ -352,18 +434,33 @@ class DataFrame{
     get datos(){
         return this.#data;
     }
+
     //% ========================
 
 
     //! Metodos SETTER ===========
     set datos(new_data){
         this.#initial_setter(new_data);
-        return this.me;
+        if (this.debug===true) this.me;
     }
 
+    //+ Metodos en la morfologia 
+    add_column(column_name, column_values){
+        const data2restructure = structuredClone(this.datos);
+        data2restructure.forEach((row,index)=> row[column_name] = column_values[index]);
+        this.datos = data2restructure;
+    }
 
     //+ Metodos comunes ==========
-    groupby(by=[]){
+    head(qty_rows=5){
+        console.table(this.datos.slice(0,qty_rows));
+    }
+
+    tail(qty_rows=5){
+        console.table(this.datos.slice(this.datos.length-qty_rows, this.datos.length));
+    }
+
+    groupby(by=[], debug=false){
         let data_grouped={};
 
         this.datos.forEach(row=>{
@@ -371,28 +468,29 @@ class DataFrame{
             key in data_grouped ? data_grouped[key].push(row):data_grouped[key]=[row]; 
         });
 
-        return new Grouper(data_grouped,by,this.columns);
+        return new Grouper(data_grouped,by,this.columns,debug);
     }
 
-    merge(df_b, how, args){
-        return merge(this, df_b, how, args);
+    merge(df_b, how, args, debug=false){
+        return merge(this, df_b, how, args, debug);
     }
 
-    filter(index_condition){
+    where(index_condition, debug=false){
         //! Deveria devolver un nuevo dataframe
         if ((index_condition === undefined) || (index_condition.length === 0)) return undefined;
 
         const new_data = this.datos.filter((_,index)=> index_condition.includes(index));
-        console.table(new_data);
+        
+        if (debug===true) console.table(new_data);
         return new DataFrame(new_data);
     }
 
-    concat(df_b){
-        return concat(this, df_b);
+    concatenate(df_b, debug=false){
+        return concatenate(this, df_b, debug);
     }
     
+    get_by_indexes(indexes){
+        return get_by_index(this.datos, indexes);
+    }
 }
-
-
-
 
