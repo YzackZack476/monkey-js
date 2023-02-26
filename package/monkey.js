@@ -267,9 +267,9 @@ function get_by_index(array,indexes){
 //! ==============================================================================
 //! Funciones para agrupaciones        
 function get_column_values(table_array=[], column){
-    let lista=[];
-    table_array.forEach(row=> lista.push(row[column]));
-    return lista;    
+    let array=[];
+    table_array.forEach(row=> array.push(row[column]));
+    return array;    
 }
 
 function conservarte_columns(table_array, column_list){
@@ -281,6 +281,8 @@ function conservarte_columns(table_array, column_list){
         return new_row;
     });
 }
+
+
 
 //% ==============================================================================
 //% Clases      
@@ -381,26 +383,27 @@ class Grouper{
 
 class DataFrame{
     #data;
-    #shape;
-    constructor(initial_data, debug=false){
+    constructor(initial_data=[], debug=false){
         this.#initial_setter([...initial_data]);
         this.debug = debug;
     }
 
     #initial_setter(in_data){
         this.#data = in_data;
+        if(this.is_empty == true) return {};
+
         this.columns.forEach(column_name => {
             let values = get_column_values(this.#data, column_name);
 
             this[column_name] = new Object(Object.assign([],values));
-            this[column_name].first = (params=values)=>calc_first(params);
-            this[column_name].last = (params=values)=>calc_last(params);
-            this[column_name].max = (params=values)=>calc_max(params);  
-            this[column_name].min = (params=values)=>calc_min(params);  
-            this[column_name].sum = (valores=values, sep='')=>calc_sum(valores, sep);  
-            this[column_name].count = (params=values)=>calc_count(params);  
-            this[column_name].unique = (params=values)=>calc_unique(params);
-            this[column_name].avg = (params=values)=>calc_avg(params);
+            this[column_name].first = (in_array=values)=>calc_first(in_array);
+            this[column_name].last = (in_array=values)=>calc_last(in_array);
+            this[column_name].max = (in_array=values)=>calc_max(in_array);  
+            this[column_name].min = (in_array=values)=>calc_min(in_array);  
+            this[column_name].sum = (in_array=values, sep='')=>calc_sum(in_array, sep);  
+            this[column_name].count = (in_array=values)=>calc_count(in_array);  
+            this[column_name].unique = (in_array=values)=>calc_unique(in_array);
+            this[column_name].avg = (in_array=values)=>calc_avg(in_array);
             
             //* Funtions in series
             this[column_name].equals = (nominal, array=values)=>calc_equals(nominal,array);
@@ -408,6 +411,7 @@ class DataFrame{
             this[column_name].evaluate = (operador,nominal,array=values)=>evaluate(operador,nominal,array);
             this[column_name].bewteen = (low,hight,array=values)=>between(low,hight,array);
             this[column_name].opr = (operador, array=values)=> calc_opr(operador,array);
+            this[column_name].zip = (array_zipper, array=values)=> calc_zip([array_zipper,array]);
 
             this[column_name].not_equals = (nominal, array=values)=>calc_not_equals(nominal,array); 
         });
@@ -418,16 +422,21 @@ class DataFrame{
     //* ==============================================================
     
     //% Metodos GETTER ==========
+    get is_empty(){
+        return this.#data.length===0?true:false;
+    }
+
     get me(){
         return console.table(this.datos);
     }
 
     get shape(){
-        this.#shape = [this.datos.length, Object.keys(this.datos.at()).length];
-        return this.#shape;
+        if(this.is_empty == true) return 'DataFrame empty';
+        return [this.datos.length, Object.keys(this.datos.at()).length];
     }
 
     get columns(){
+        if(this.is_empty == true) return [];
         return Object.keys(this.datos.at());
     }
 
@@ -493,4 +502,3 @@ class DataFrame{
         return get_by_index(this.datos, indexes);
     }
 }
-
