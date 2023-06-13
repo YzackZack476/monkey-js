@@ -6,15 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="./style/style.css" rel="stylesheet">
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/1810/1810945.png">
-    <script src="./scripts/main.js"></script>
-    <script src="./package/monkey.js"></script>
+    <script type="module" src="./scripts/main.js"></script>
+
+    <!--* ▃▃ Typescript dependeces ▃▃ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/typescript/5.1.3/typescript.min.js" integrity="sha512-gYrAETVZWqQ4aAwe1gRJ1QJLOILzC4zY5usT6DmuAK8qMh9eyq3P1dvYkLEiHDmzBZocbilA7afvmcaGF1zZGw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/typescript/5.1.3/typescript.js" integrity="sha512-ML3vtgjrxfsOnZb/l5C40AdXwnxd/VRRDan1OlmzQc4Di+vxCVm4pEBQWafKBhl+lqzTXI5kNqmZ5KPfiGSucA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    
+    <!--% ▃▃ Importing monkey js ▃▃ -->
+    <script type="module">
+        import { ts_compiler } from './scripts/controller/typescript_compiler.js';
+        ts_compiler(['./scripts/hello.ts']);    
+    </script>
+
     <title>Monkey js</title>
 </head>
 <body>
-    
-    <nav>
-        <h1>Monkey JS</h1>
-    </nav>
     
 </body>
 </html>
